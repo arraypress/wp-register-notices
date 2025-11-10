@@ -4,10 +4,10 @@
  *
  * A simplified, declarative API for managing WordPress admin notices.
  *
- * @package     ArrayPress\WP\Utils
+ * @package     ArrayPress\AdminNotices
  * @copyright   Copyright (c) 2025, ArrayPress Limited
  * @license     GPL2+
- * @version     1.0.0
+ * @version     1.1.0
  * @author      David Sherlock
  */
 
@@ -49,7 +49,7 @@ class Manager {
      * @since 1.0.0
      * @var array
      */
-    private array $options;
+    private array $options = [];
 
     /**
      * Active notices to display this request
@@ -70,14 +70,15 @@ class Manager {
     /**
      * Constructor
      *
-     * @param string      $context     Unique context/namespace for this notice group
-     * @param array       $options     {
-     *                                 Global options for all notices in this group
+     * @param string      $context      Unique context/namespace for this notice group
+     * @param array       $options      {
+     *                                  Global options for all notices in this group
      *
-     * @type array|string $pages       Default pages for all notices
-     * @type string       $capability  Default capability for all notices
-     * @type bool         $dismissible Default dismissible state (default: true)
-     *                                 }
+     * @type array|string $pages        Default pages for all notices
+     * @type string       $capability   Default capability for all notices
+     * @type bool         $dismissible  Default dismissible state (default: true)
+     * @type int          $auto_dismiss Default auto-dismiss time in milliseconds (default: 0)
+     *                                  }
      * @since 1.0.0
      *
      */
@@ -85,9 +86,10 @@ class Manager {
         $this->context = sanitize_key( $context );
 
         $defaults = [
-                'pages'       => null,
-                'capability'  => null,
-                'dismissible' => true,
+                'pages'        => null,
+                'capability'   => null,
+                'dismissible'  => true,
+                'auto_dismiss' => 0,
         ];
 
         $this->options = wp_parse_args( $options, $defaults );
@@ -99,21 +101,22 @@ class Manager {
      * Registers admin notices with various configuration options.
      * Notices can be simple strings or complex configurations with callbacks.
      *
-     * @param array          $notices     {
-     *                                    Array of notice configurations. Can be:
-     *                                    - Simple: 'key' => 'message'
-     *                                    - Complex: 'key' => [ configuration array ]
+     * @param array          $notices      {
+     *                                     Array of notice configurations. Can be:
+     *                                     - Simple: 'key' => 'message'
+     *                                     - Complex: 'key' => [ configuration array ]
      *
-     * @type string|callable $message     Notice message or callback that returns message
-     * @type string          $type        Notice type: 'success', 'error', 'warning', 'info'
-     * @type string          $trigger     GET parameter that triggers this notice
-     * @type array           $data        GET parameters to pass to message callback
-     * @type callable        $condition   Callback to determine if notice should show
-     * @type bool            $dismissible Whether notice can be dismissed (default: true)
-     * @type bool            $persistent  Whether notice shows on every page load (default: false)
-     * @type string          $capability  Required capability to see notice
-     * @type array|string    $pages       Admin pages where notice can appear
-     *                                    }
+     * @type string|callable $message      Notice message or callback that returns message
+     * @type string          $type         Notice type: 'success', 'error', 'warning', 'info'
+     * @type string          $trigger      GET parameter that triggers this notice
+     * @type array           $data         GET parameters to pass to message callback
+     * @type callable        $condition    Callback to determine if notice should show
+     * @type bool            $dismissible  Whether notice can be dismissed (default: true)
+     * @type int             $auto_dismiss Auto-dismiss after milliseconds (0 = never)
+     * @type bool            $persistent   Whether notice shows on every page load (default: false)
+     * @type string          $capability   Required capability to see notice
+     * @type array|string    $pages        Admin pages where notice can appear
+     *                                     }
      * @return self Returns instance for method chaining
      * @since 1.0.0
      *
@@ -211,15 +214,16 @@ class Manager {
 
         // Apply defaults
         $defaults = [
-                'message'     => '',
-                'type'        => 'success',
-                'trigger'     => $key,
-                'data'        => [],
-                'condition'   => null,
-                'dismissible' => $this->options['dismissible'],
-                'persistent'  => false,
-                'capability'  => $this->options['capability'],
-                'pages'       => $this->options['pages'],
+                'message'      => '',
+                'type'         => 'success',
+                'trigger'      => $key,
+                'data'         => [],
+                'condition'    => null,
+                'dismissible'  => $this->options['dismissible'],
+                'auto_dismiss' => $this->options['auto_dismiss'],
+                'persistent'   => false,
+                'capability'   => $this->options['capability'],
+                'pages'        => $this->options['pages'],
         ];
 
         $notice = wp_parse_args( $notice, $defaults );
@@ -229,7 +233,48 @@ class Manager {
             $notice['data'] = [ $notice['data'] ];
         }
 
+        // Smart defaults for auto-dismiss based on type
+        if ( $notice['auto_dismiss'] === 0 && $this->should_auto_dismiss_type( $notice['type'] ) ) {
+            $notice['auto_dismiss'] = $this->get_auto_dismiss_time( $notice['type'] );
+        }
+
         return $notice;
+    }
+
+    /**
+     * Check if notice type should auto-dismiss by default
+     *
+     * @param string $type Notice type
+     *
+     * @return bool Whether type should auto-dismiss
+     * @since  1.1.0
+     * @access private
+     *
+     */
+    private function should_auto_dismiss_type( string $type ): bool {
+        // Only auto-dismiss success messages by default if explicitly configured
+        return false; // Changed to false - make it opt-in only
+    }
+
+    /**
+     * Get default auto-dismiss time for notice type
+     *
+     * @param string $type Notice type
+     *
+     * @return int Milliseconds before auto-dismiss
+     * @since  1.1.0
+     * @access private
+     *
+     */
+    private function get_auto_dismiss_time( string $type ): int {
+        $times = [
+                'success' => 5000,  // 5 seconds
+                'info'    => 7000,  // 7 seconds
+                'warning' => 0,     // Don't auto-dismiss
+                'error'   => 0,     // Never auto-dismiss
+        ];
+
+        return $times[ $type ] ?? 0;
     }
 
     /**
@@ -353,10 +398,11 @@ class Manager {
         }
 
         return [
-                'key'         => $key,
-                'message'     => $message,
-                'type'        => $notice['type'],
-                'dismissible' => $notice['dismissible']
+                'key'          => $key,
+                'message'      => $message,
+                'type'         => $notice['type'],
+                'dismissible'  => $notice['dismissible'],
+                'auto_dismiss' => $notice['auto_dismiss']
         ];
     }
 
@@ -381,21 +427,34 @@ class Manager {
                 continue;
             }
 
-            $classes   = $this->get_notice_classes( $notice['type'], $notice['dismissible'] );
-            $notice_id = esc_attr( $this->context . '-' . $notice['key'] );
+            $classes = $this->get_notice_classes( $notice['type'], $notice['dismissible'] );
+
+            // Add auto-dismiss class if needed
+            if ( $notice['auto_dismiss'] > 0 ) {
+                $classes .= ' wp-flyout-auto-dismiss';
+            }
+
+            // Build data attributes
+            $data_attrs = [
+                    'data-notice-context="' . esc_attr( $this->context ) . '"',
+                    'data-notice-key="' . esc_attr( $notice['key'] ) . '"'
+            ];
+
+            if ( $notice['auto_dismiss'] > 0 ) {
+                $data_attrs[] = 'data-auto-dismiss="' . esc_attr( (string) $notice['auto_dismiss'] ) . '"';
+            }
 
             printf(
-                    '<div class="%1$s" data-notice-context="%2$s" data-notice-key="%3$s">%4$s</div>',
+                    '<div class="%1$s" %2$s>%3$s</div>',
                     esc_attr( $classes ),
-                    esc_attr( $this->context ),
-                    esc_attr( $notice['key'] ),
+                    implode( ' ', $data_attrs ),
                     wp_kses_post( wpautop( $notice['message'] ) )
             );
         }
 
-        // Add dismissal script once if we have dismissible notices
-        if ( ! $script_added && $this->has_dismissible_notices() ) {
-            $this->add_dismissal_script();
+        // Add dismissal script once if we have dismissible or auto-dismiss notices
+        if ( ! $script_added && ( $this->has_dismissible_notices() || $this->has_auto_dismiss_notices() ) ) {
+            $this->add_scripts();
             $script_added = true;
         }
     }
@@ -411,6 +470,24 @@ class Manager {
     private function has_dismissible_notices(): bool {
         foreach ( $this->active as $notice ) {
             if ( $notice['dismissible'] ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if there are auto-dismiss notices
+     *
+     * @return bool True if any active notice has auto-dismiss
+     * @since  1.1.0
+     * @access private
+     *
+     */
+    private function has_auto_dismiss_notices(): bool {
+        foreach ( $this->active as $notice ) {
+            if ( $notice['auto_dismiss'] > 0 ) {
                 return true;
             }
         }
@@ -451,20 +528,56 @@ class Manager {
     }
 
     /**
-     * Add dismissal JavaScript
-     *
-     * Outputs inline JavaScript to handle notice dismissal via AJAX.
+     * Add dismissal and auto-dismiss JavaScript with styles
      *
      * @return void
-     * @since  1.0.0
+     * @since  1.1.0
      * @access private
      *
      */
-    private function add_dismissal_script(): void {
+    private function add_scripts(): void {
         $nonce = wp_create_nonce( 'dismiss_notice_' . $this->context );
         ?>
+        <style>
+            .notice.wp-flyout-auto-dismiss {
+                position: relative;
+                overflow: hidden;
+            }
+
+            .notice.wp-flyout-auto-dismiss .notice-dismiss-progress {
+                position: absolute;
+                bottom: 0;
+                left: 0;
+                height: 3px;
+                background: currentColor;
+                opacity: 0.2;
+                transition: width linear;
+                width: 100%;
+            }
+
+            .notice.notice-success .notice-dismiss-progress {
+                background-color: #00a32a;
+            }
+
+            .notice.notice-info .notice-dismiss-progress {
+                background-color: #72aee6;
+            }
+
+            .notice.notice-warning .notice-dismiss-progress {
+                background-color: #dba617;
+            }
+
+            .notice.notice-error .notice-dismiss-progress {
+                background-color: #d63638;
+            }
+
+            .notice.wp-flyout-auto-dismiss.paused .notice-dismiss-progress {
+                transition: none !important;
+            }
+        </style>
         <script>
             jQuery(function ($) {
+                // Regular dismissal handler
                 $(document).on('click', '.notice[data-notice-context="<?php echo esc_js( $this->context ); ?>"] .notice-dismiss', function () {
                     var $notice = $(this).closest('.notice');
                     var key = $notice.attr('data-notice-key');
@@ -475,6 +588,81 @@ class Manager {
                             _wpnonce: '<?php echo esc_js( $nonce ); ?>'
                         });
                     }
+                });
+
+                // Auto-dismiss notices with visual progress
+                $('.notice[data-auto-dismiss]').each(function () {
+                    var $notice = $(this);
+                    var delay = parseInt($notice.attr('data-auto-dismiss')) || 5000;
+                    var timer;
+                    var isPaused = false;
+
+                    // Add progress bar
+                    var $progress = $('<div class="notice-dismiss-progress"></div>').appendTo($notice);
+
+                    // Start the countdown
+                    function startTimer() {
+                        // Animate progress bar to 0
+                        setTimeout(function () {
+                            if (!isPaused) {
+                                $progress.css({
+                                    'transition-duration': (delay / 1000) + 's',
+                                    'width': '0%'
+                                });
+                            }
+                        }, 10);
+
+                        // Set timer to remove notice
+                        timer = setTimeout(function () {
+                            if (!isPaused) {
+                                $notice.fadeOut(400, function () {
+                                    $notice.remove();
+                                });
+                            }
+                        }, delay);
+                    }
+
+                    // Pause on hover
+                    $notice.on('mouseenter', function () {
+                        isPaused = true;
+                        $notice.addClass('paused');
+                        clearTimeout(timer);
+
+                        // Stop the progress bar animation
+                        var currentWidth = $progress[0].offsetWidth;
+                        $progress.css({
+                            'transition-duration': '0s',
+                            'width': currentWidth + 'px'
+                        });
+                    });
+
+                    // Resume on mouse leave
+                    $notice.on('mouseleave', function () {
+                        isPaused = false;
+                        $notice.removeClass('paused');
+
+                        // Calculate remaining time based on progress bar width
+                        var remainingPercent = $progress.width() / $notice.width();
+                        var remainingTime = delay * remainingPercent;
+
+                        // Resume progress bar animation
+                        $progress.css({
+                            'transition-duration': (remainingTime / 1000) + 's',
+                            'width': '0%'
+                        });
+
+                        // Reset timer with remaining time
+                        timer = setTimeout(function () {
+                            if (!isPaused) {
+                                $notice.fadeOut(400, function () {
+                                    $notice.remove();
+                                });
+                            }
+                        }, remainingTime);
+                    });
+
+                    // Start the initial timer
+                    startTimer();
                 });
             });
         </script>
