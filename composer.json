@@ -1,7 +1,7 @@
 {
   "name": "arraypress/wp-register-notices",
   "version": "1.0.0",
-  "description": "A streamlined WordPress admin notices registration system with support for dismissible notices and error handling",
+  "description": "A declarative WordPress admin notices system with automatic GET parameter handling, conditional display, and dismissible notices",
   "type": "library",
   "license": "GPL-2.0-or-later",
   "homepage": "https://github.com/arraypress/wp-register-notices/",
@@ -16,10 +16,10 @@
   },
   "autoload": {
     "psr-4": {
-      "ArrayPress\\WP\\Register\\": "src/"
+      "ArrayPress\\AdminNotices\\": "src/"
     },
     "files": [
-      "src/Utilities.php"
+      "src/Functions.php"
     ]
   },
   "config": {
@@ -44,6 +44,8 @@
     "wp-notifications",
     "dismissible-notices",
     "error-handling",
-    "user-notifications"
+    "user-notifications",
+    "declarative-api",
+    "trigger-based"
   ]
 }

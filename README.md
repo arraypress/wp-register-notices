@@ -1,224 +1,263 @@
-# WordPress Admin Notices Registration Library
+# WordPress Admin Notices Registration System
 
-A comprehensive PHP library for registering and managing WordPress admin notices programmatically. This library provides a robust solution for creating dynamic admin notices with support for dismissible notices, role-based display, conditional rendering, and automatic notice triggering via query parameters.
+A declarative, lightweight system for managing WordPress admin notices with automatic GET parameter handling, conditional display, and dismissible notices.
 
 ## Features
 
-- 🚀 Simple notice registration and management
-- 🔄 Support for dismissible notices
-- 👥 Role-based notice display
-- 🎯 Conditional notice rendering
-- 📦 Multiple notice types (success, error, warning, info)
-- 🔒 Capability checks
-- 🛠️ Simple utility functions for quick implementation
-- ✅ WP_Error object support
-- 🔍 Debug logging support
-
-## Requirements
-
-- PHP 7.4 or higher
-- WordPress 5.0 or higher
+* **Declarative API**: Register all your notices in one place with a clean configuration array
+* **Automatic Triggers**: Notices appear based on GET parameters (e.g., `?updated=1`)
+* **Dynamic Messages**: Support for callbacks with data interpolation
+* **Conditional Display**: Show notices based on conditions (e.g., missing API keys)
+* **Dismissible Notices**: Built-in AJAX dismissal with per-user persistence
+* **Page Targeting**: Limit notices to specific admin pages with wildcard support
+* **Smart Type Detection**: Automatically infers notice type from key naming
+* **Capability Checks**: Restrict notices based on user permissions
 
 ## Installation
 
-You can install the package via composer:
-
+Install via Composer:
 ```bash
 composer require arraypress/wp-register-notices
 ```
 
 ## Basic Usage
-
-Here's a simple example of registering admin notices:
-
 ```php
-// Define your notices
-$notices = [
-	'settings-updated' => [
-		'message'     => 'Settings saved successfully.',
-		'class'       => 'updated',
-		'dismissible' => true
-	],
-	'license-expired'  => [
-		'message'    => 'Your license has expired.',
-		'class'      => 'notice-error',
-		'capability' => 'manage_options',
-		'conditions' => function () {
-			return ! is_license_valid();
-		}
-	]
-];
+use function ArrayPress\AdminNotices\register_admin_notices;
 
-// Register notices with a prefix
-register_admin_notices( $notices, 'my_plugin' );
+// Register your notices during plugin initialization
+register_admin_notices( 'myplugin', [
+    // Simple success messages
+    'added'   => __( 'Item added successfully.', 'myplugin' ),
+    'updated' => __( 'Item updated successfully.', 'myplugin' ),
+    'deleted' => __( 'Item deleted successfully.', 'myplugin' ),
+] );
+
+// Trigger by redirecting with the parameter
+wp_redirect( admin_url( 'admin.php?page=myplugin&updated=1' ) );
+```
+
+## Advanced Examples
+
+### Dynamic Messages with Data
+```php
+register_admin_notices( 'myplugin', [
+    'bulk_deleted' => [
+        'message' => function( $args ) {
+            $count = absint( $args['count'] ?? 0 );
+            return sprintf(
+                _n( '%d item deleted.', '%d items deleted.', $count, 'myplugin' ),
+                $count
+            );
+        },
+        'type' => 'success',
+        'data' => ['count']  // Collect these GET parameters
+    ]
+] );
+
+// Trigger: ?bulk_deleted=1&count=5
+// Shows: "5 items deleted."
+```
+
+### Persistent Conditional Notices
+```php
+register_admin_notices( 'myplugin', [
+    'api_key_missing' => [
+        'condition' => function() {
+            return empty( get_option( 'myplugin_api_key' ) );
+        },
+        'message' => function() {
+            $url = admin_url( 'admin.php?page=myplugin-settings' );
+            return sprintf( 
+                __( 'API key required. <a href="%s">Configure settings</a>.', 'myplugin' ),
+                esc_url( $url )
+            );
+        },
+        'type'        => 'warning',
+        'persistent'  => true,        // Shows on every page load
+        'dismissible' => false         // Can't be dismissed
+    ]
+] );
+```
+
+### Page-Specific Notices
+```php
+register_admin_notices( 'myplugin', [
+    'settings_saved' => __( 'Settings saved successfully.', 'myplugin' ),
+    'license_activated' => __( 'License activated.', 'myplugin' ),
+], [
+    'pages' => ['myplugin-settings', 'myplugin-license'],  // Only these pages
+    'capability' => 'manage_options'                        // Admin only
+] );
+```
+
+### Error Handling
+```php
+register_admin_notices( 'myplugin', [
+    'error' => [
+        'message' => function( $args ) {
+            return esc_html( $args['message'] ?? __( 'An error occurred.', 'myplugin' ) );
+        },
+        'type' => 'error',
+        'data' => ['message']
+    ]
+] );
+
+// Trigger: ?error=1&message=Invalid+email+address
+// Shows: "Invalid email address"
+```
+
+### Working with IDs
+```php
+register_admin_notices( 'myplugin', [
+    'item_updated' => [
+        'message' => function( $args ) {
+            if ( ! empty( $args['id'] ) ) {
+                return sprintf( __( 'Item #%d updated.', 'myplugin' ), $args['id'] );
+            }
+            return __( 'Item updated.', 'myplugin' );
+        },
+        'data' => ['id']
+    ]
+] );
+
+// Trigger: ?item_updated=1&id=123
+// Shows: "Item #123 updated."
 ```
 
 ## Configuration Options
 
-Each notice can be configured with:
+### Notice Configuration
 
-| Option | Type | Description |
-|--------|------|-------------|
-| message | string\|callable\|WP_Error | Notice message content (required) |
-| class | string | CSS class: 'updated', 'notice-error', 'notice-warning', 'notice-info' |
-| is_dismissible | bool | Whether the notice can be dismissed |
-| capability | string | Required user capability to view notice |
-| conditions | callable | Function returning bool to determine if notice should display |
+| Option | Type | Description | Default |
+|--------|------|-------------|---------|
+| `message` | string\|callable | The notice message or callback | Required |
+| `type` | string | Notice type: `success`, `error`, `warning`, `info` | `success` |
+| `trigger` | string | GET parameter that triggers the notice | Key name |
+| `data` | array | GET parameters to pass to message callback | `[]` |
+| `condition` | callable | Function to determine if notice should show | `null` |
+| `persistent` | bool | Shows on every page load when condition is met | `false` |
+| `dismissible` | bool | Whether notice can be dismissed | `true` |
+| `capability` | string | Required capability to see notice | `null` |
+| `pages` | array\|string | Admin pages where notice appears (`'all'` for global) | `null` |
 
-## Advanced Usage
-
-### Dynamic Messages
-
-Create notices with dynamic content:
-
+### Global Options
 ```php
-$notices = [
-	'import-complete' => [
-		'message' => function () {
-			$count = get_transient( 'import_count' );
-
-			return sprintf(
-				'Successfully imported %d items.',
-				intval( $count )
-			);
-		},
-		'class'   => 'updated'
-	]
-];
-
-register_admin_notices( $notices, 'my_plugin' );
+register_admin_notices( 'myplugin', $notices, [
+    'pages'       => ['myplugin', 'myplugin-*'],  // Wildcard support
+    'capability'  => 'manage_options',
+    'dismissible' => true                          // Default for all notices
+] );
 ```
 
-### Conditional Display
+## Type Detection
 
-Control notice visibility based on conditions:
-
+The system automatically infers notice types from key names:
 ```php
-$notices = [
-	'update-required' => [
-		'message'    => 'Plugin update required.',
-		'class'      => 'notice-warning',
-		'capability' => 'install_plugins',
-		'conditions' => function () {
-			return version_compare(
-				get_plugin_version(),
-				'2.0.0',
-				'<'
-			);
-		}
-	]
-];
+register_admin_notices( 'myplugin', [
+    'item_updated'        => 'Updated!',    // success (default)
+    'item_deleted_error'  => 'Failed!',     // error (suffix)
+    'warning_low_stock'   => 'Low stock',   // warning (prefix)
+    'info_new_feature'    => 'New feature'  // info (prefix)
+] );
 ```
 
-### Handling WP_Error Objects
-
-Automatically handle error objects:
-
+## Real-World Example
 ```php
-// In your process function
-try {
-	process_data();
-} catch ( Exception $e ) {
-	$error = new WP_Error(
-		'process_failed',
-		$e->getMessage()
-	);
-	add_error_notice( $error, 'process-error', [], 'my_plugin' );
+// In your plugin's main file or admin initialization
+add_action( 'admin_init', function() {
+    register_admin_notices( 'woocommerce_extras', [
+        // Simple CRUD notifications
+        'product_added'   => __( 'Product added successfully.', 'wc-extras' ),
+        'product_updated' => __( 'Product updated successfully.', 'wc-extras' ),
+        'product_deleted' => __( 'Product deleted successfully.', 'wc-extras' ),
+        
+        // Bulk operations with counts
+        'bulk_updated' => [
+            'message' => function( $args ) {
+                $count = absint( $args['count'] ?? 0 );
+                return sprintf( 
+                    _n( 
+                        '%d product updated.', 
+                        '%d products updated.', 
+                        $count, 
+                        'wc-extras' 
+                    ), 
+                    $count 
+                );
+            },
+            'data' => ['count']
+        ],
+        
+        // Persistent warnings
+        'shipping_not_configured' => [
+            'condition' => function() {
+                $zones = WC_Shipping_Zones::get_zones();
+                return empty( $zones );
+            },
+            'message' => __( 'No shipping zones configured. Products cannot be shipped.', 'wc-extras' ),
+            'type' => 'warning',
+            'persistent' => true
+        ],
+        
+        // Error handling
+        'import_failed' => [
+            'message' => function( $args ) {
+                $error = $args['error'] ?? __( 'Unknown error', 'wc-extras' );
+                $line = $args['line'] ?? 0;
+                
+                if ( $line > 0 ) {
+                    return sprintf( 
+                        __( 'Import failed at line %d: %s', 'wc-extras' ), 
+                        $line, 
+                        esc_html( $error ) 
+                    );
+                }
+                
+                return sprintf( __( 'Import failed: %s', 'wc-extras' ), esc_html( $error ) );
+            },
+            'type' => 'error',
+            'data' => ['error', 'line']
+        ]
+    ], [
+        'pages' => ['woocommerce', 'edit-product', 'product'],
+        'capability' => 'manage_woocommerce'
+    ] );
+} );
+
+// In your form handler
+function handle_product_save() {
+    $product_id = save_product( $_POST );
+    
+    if ( is_wp_error( $product_id ) ) {
+        $url = add_query_arg( [
+            'import_failed' => 1,
+            'error' => $product_id->get_error_message()
+        ], admin_url( 'edit.php?post_type=product' ) );
+    } else {
+        $url = add_query_arg( [
+            'product_updated' => 1,
+            'id' => $product_id
+        ], admin_url( 'edit.php?post_type=product' ) );
+    }
+    
+    wp_redirect( $url );
+    exit;
 }
 ```
 
-### Full Integration Example
+## Requirements
 
-Here's an example showing more advanced usage:
-
-```php
-class MyPlugin {
-	public function init() {
-		// Register all notices
-		$this->register_notices();
-
-		// Handle form submissions
-		add_action( 'admin_init', [ $this, 'handle_form_submission' ] );
-	}
-
-	private function register_notices() {
-		$notices = [
-			'settings-updated' => [
-				'message' => 'Settings saved successfully.',
-				'class'   => 'updated'
-			],
-			'license-status'   => [
-				'message'    => function () {
-					return $this->get_license_message();
-				},
-				'class'      => 'notice-warning',
-				'capability' => 'manage_options',
-				'conditions' => [ $this, 'should_show_license_notice' ]
-			]
-		];
-
-		register_admin_notices( $notices, 'my_plugin' );
-	}
-
-	public function handle_form_submission() {
-		if ( ! isset( $_POST['my_plugin_action'] ) ) {
-			return;
-		}
-
-		check_admin_referer( 'my_plugin_action' );
-		$redirect_url = admin_url( 'admin.php?page=my-plugin' );
-
-		if ( $this->process_form() ) {
-			$redirect_url = add_query_arg(
-				'my-plugin-notice',
-				'settings-updated',
-				$redirect_url
-			);
-		}
-
-		wp_safe_redirect( $redirect_url );
-		exit;
-	}
-}
-```
-
-## Utility Functions
-
-Global helper functions for easy access:
-
-```php
-// Register multiple notices
-register_admin_notices( $notices, 'prefix' );
-
-// Add individual notices
-add_admin_notice( $message, $id, $type, $args, 'prefix' );
-add_success_notice( $message, $id, $args, 'prefix' );
-add_error_notice( $message, $id, $args, 'prefix' );
-add_warning_notice( $message, $id, $args, 'prefix' );
-add_info_notice( $message, $id, $args, 'prefix' );
-```
-
-## Debug Mode
-
-Debug logging is enabled when WP_DEBUG is true:
-
-```php
-// Logs will include:
-// - Notice registration
-// - Notice display attempts
-// - Capability checks
-// - Dismissal actions
-// - Error messages
-```
+- PHP 7.4 or later
+- WordPress 5.0 or later
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-This project is licensed under the GPL2+ License. See the LICENSE file for details.
+This project is licensed under the GPL-2.0-or-later License.
 
-## Support
+## Credits
 
-For support, please use the [issue tracker](https://github.com/arraypress/wp-register-notices/issues).
+Created by [David Sherlock](https://davidsherlock.com) at [ArrayPress](https://arraypress.com).
