@@ -16,7 +16,7 @@
   },
   "autoload": {
     "psr-4": {
-      "ArrayPress\\AdminNotices\\": "src/"
+      "ArrayPress\\RegisterNotices\\": "src/"
     },
     "files": [
       "src/Functions.php"

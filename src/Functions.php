@@ -13,7 +13,7 @@
 
 declare( strict_types=1 );
 
-use ArrayPress\AdminNotices\Manager;
+use ArrayPress\RegisterNotices\Manager;
 
 if ( ! function_exists( 'register_admin_notices' ) ) {
 	/**

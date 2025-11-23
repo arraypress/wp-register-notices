@@ -13,7 +13,7 @@
 
 declare( strict_types=1 );
 
-namespace ArrayPress\AdminNotices;
+namespace ArrayPress\RegisterNotices;
 
 // Exit if accessed directly
 defined( 'ABSPATH' ) || exit;
