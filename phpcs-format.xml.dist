@@ -1,0 +1,71 @@
+<?xml version="1.0"?>
+<ruleset name="WP Register Columns (formatting)">
+    <description>Formatting and style. Separate from the lint: a clean lint does not mean a clean format check.</description>
+
+    <file>src</file>
+
+    <arg name="extensions" value="php"/>
+    <arg name="colors"/>
+    <arg value="sp"/>
+
+    <config name="installed_paths" value="vendor/wp-coding-standards/wpcs,vendor/phpcompatibility/php-compatibility,vendor/phpcompatibility/phpcompatibility-paragonie,vendor/phpcompatibility/phpcompatibility-wp,vendor/phpcsstandards/phpcsutils,vendor/phpcsstandards/phpcsextra"/>
+
+    <rule ref="WordPress-Core">
+        <exclude name="Universal.Arrays.DisallowShortArraySyntax"/>
+        <exclude name="WordPress.PHP.YodaConditions"/>
+        <exclude name="Generic.WhiteSpace.DisallowSpaceIndent"/>
+        <exclude name="Generic.WhiteSpace.ScopeIndent"/>
+        <exclude name="PEAR.Functions.FunctionCallSignature"/>
+        <exclude name="Squiz.Commenting.FileComment"/>
+        <exclude name="Universal.Operators.DisallowShortTernary"/>
+        <exclude name="Generic.Formatting.MultipleStatementAlignment"/>
+        <exclude name="WordPress.Arrays.MultipleStatementAlignment"/>
+
+        <!--
+            $object is the third parameter of render_column_content(), which
+            four plugins implement. PHP does not reserve it as a variable name
+            and WordPress core uses it itself; renaming it here would be a
+            breaking change to the abstract's signature for no gain.
+        -->
+        <exclude name="Universal.NamingConventions.NoReservedKeywordParameterNames"/>
+    </rule>
+
+    <rule ref="WordPress.Security.EscapeOutput">
+        <!--
+            Every one of these echoes the return value of an EDD markup helper:
+            EDD()->html->select(), ->product_dropdown(), ->date_field() and the
+            rest. They return escaped HTML by design, and escaping the result
+            again would print the tags instead of rendering the controls.
+            Rendering EDD's own fields is what this library is for, so the
+            exclusion is the whole file rather than a line list.
+        -->
+    </rule>
+
+
+    <rule ref="WordPress.Files.FileName">
+        <!--
+            Off, not waived. This is a Composer library autoloaded by PSR-4,
+            which requires the file to be named for the class it declares:
+            Exporters.php. WordPress wants class-exporters.php. The two rules
+            are mutually exclusive, and renaming the files to satisfy this one
+            would stop the autoloader finding them at all.
+        -->
+        <exclude-pattern>*</exclude-pattern>
+    </rule>
+
+
+    <rule ref="WordPress.Security.EscapeOutput">
+        <!--
+            These echo the return value of a plugin's own display_callback.
+            Column content is markup by contract; the whole point of the
+            callback is to let a plugin return a link or a badge, and escaping
+            it here would print the tags. Escaping is the callback's job, and
+            the consuming plugins do it.
+        -->
+        <exclude-pattern>src/Tables/*</exclude-pattern>
+    </rule>
+
+
+
+
+</ruleset>

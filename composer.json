@@ -1,51 +1,50 @@
 {
-  "name": "arraypress/wp-register-notices",
-  "version": "1.0.0",
-  "description": "A declarative WordPress admin notices system with automatic GET parameter handling, conditional display, and dismissible notices",
-  "type": "library",
-  "license": "GPL-2.0-or-later",
-  "homepage": "https://github.com/arraypress/wp-register-notices/",
-  "authors": [
-    {
-      "name": "David Sherlock",
-      "homepage": "https://arraypress.com/"
-    }
-  ],
-  "require": {
-    "php": ">=7.4"
-  },
-  "autoload": {
-    "psr-4": {
-      "ArrayPress\\RegisterNotices\\": "src/"
+    "name": "arraypress/wp-register-notices",
+    "description": "Declarative WordPress admin notices \u2014 dismissible, per-user, and shown after a redirect.",
+    "type": "library",
+    "license": "GPL-2.0-or-later",
+    "authors": [
+        {
+            "name": "David Sherlock",
+            "homepage": "https://arraypress.com/"
+        }
+    ],
+    "require": {
+        "php": ">=8.3"
     },
-    "files": [
-      "src/Functions.php"
-    ]
-  },
-  "config": {
-    "optimize-autoloader": true,
-    "sort-packages": true,
-    "preferred-install": "dist"
-  },
-  "minimum-stability": "dev",
-  "prefer-stable": true,
-  "support": {
-    "issues": "https://github.com/arraypress/wp-register-notices/issues",
-    "source": "https://github.com/arraypress/wp-register-notices"
-  },
-  "keywords": [
-    "wordpress",
-    "admin-notices",
-    "notifications",
-    "wp-admin",
-    "notices",
-    "messages",
-    "admin-messages",
-    "wp-notifications",
-    "dismissible-notices",
-    "error-handling",
-    "user-notifications",
-    "declarative-api",
-    "trigger-based"
-  ]
+    "require-dev": {
+        "phpcompatibility/phpcompatibility-wp": "^2.1",
+        "phpunit/phpunit": "^12.0",
+        "squizlabs/php_codesniffer": "^3.13.5",
+        "wp-coding-standards/wpcs": "^3.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "ArrayPress\\RegisterNotices\\": "src/"
+        },
+        "files": [
+            "src/Utils/Functions.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "ArrayPress\\RegisterNotices\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "lint": "phpcs",
+        "format": "phpcbf --standard=phpcs-format.xml.dist",
+        "format:check": "phpcs --standard=phpcs-format.xml.dist"
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true,
+        "preferred-install": "dist",
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": false
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
 }

@@ -1,263 +1,119 @@
-# WordPress Admin Notices Registration System
+# Register Notices
 
-A declarative, lightweight system for managing WordPress admin notices with automatic GET parameter handling, conditional display, and dismissible notices.
+Declare a plugin's admin notices once, and have them shown when they apply and
+stay dismissed when they are dismissed.
 
-## Features
+## Install
 
-* **Declarative API**: Register all your notices in one place with a clean configuration array
-* **Automatic Triggers**: Notices appear based on GET parameters (e.g., `?updated=1`)
-* **Dynamic Messages**: Support for callbacks with data interpolation
-* **Conditional Display**: Show notices based on conditions (e.g., missing API keys)
-* **Dismissible Notices**: Built-in AJAX dismissal with per-user persistence
-* **Page Targeting**: Limit notices to specific admin pages with wildcard support
-* **Smart Type Detection**: Automatically infers notice type from key naming
-* **Capability Checks**: Restrict notices based on user permissions
-
-## Installation
-
-Install via Composer:
 ```bash
 composer require arraypress/wp-register-notices
 ```
 
-## Basic Usage
+Requires PHP 8.3.
+
+## Use
+
 ```php
-use function ArrayPress\AdminNotices\register_admin_notices;
-
-// Register your notices during plugin initialization
-register_admin_notices( 'myplugin', [
-    // Simple success messages
-    'added'   => __( 'Item added successfully.', 'myplugin' ),
-    'updated' => __( 'Item updated successfully.', 'myplugin' ),
-    'deleted' => __( 'Item deleted successfully.', 'myplugin' ),
-] );
-
-// Trigger by redirecting with the parameter
-wp_redirect( admin_url( 'admin.php?page=myplugin&updated=1' ) );
-```
-
-## Advanced Examples
-
-### Dynamic Messages with Data
-```php
-register_admin_notices( 'myplugin', [
-    'bulk_deleted' => [
-        'message' => function( $args ) {
-            $count = absint( $args['count'] ?? 0 );
-            return sprintf(
-                _n( '%d item deleted.', '%d items deleted.', $count, 'myplugin' ),
-                $count
-            );
-        },
-        'type' => 'success',
-        'data' => ['count']  // Collect these GET parameters
-    ]
-] );
-
-// Trigger: ?bulk_deleted=1&count=5
-// Shows: "5 items deleted."
-```
-
-### Persistent Conditional Notices
-```php
-register_admin_notices( 'myplugin', [
-    'api_key_missing' => [
-        'condition' => function() {
-            return empty( get_option( 'myplugin_api_key' ) );
-        },
-        'message' => function() {
-            $url = admin_url( 'admin.php?page=myplugin-settings' );
-            return sprintf( 
-                __( 'API key required. <a href="%s">Configure settings</a>.', 'myplugin' ),
-                esc_url( $url )
-            );
-        },
-        'type'        => 'warning',
-        'persistent'  => true,        // Shows on every page load
-        'dismissible' => false         // Can't be dismissed
-    ]
-] );
-```
-
-### Page-Specific Notices
-```php
-register_admin_notices( 'myplugin', [
-    'settings_saved' => __( 'Settings saved successfully.', 'myplugin' ),
-    'license_activated' => __( 'License activated.', 'myplugin' ),
-], [
-    'pages' => ['myplugin-settings', 'myplugin-license'],  // Only these pages
-    'capability' => 'manage_options'                        // Admin only
-] );
-```
-
-### Error Handling
-```php
-register_admin_notices( 'myplugin', [
-    'error' => [
-        'message' => function( $args ) {
-            return esc_html( $args['message'] ?? __( 'An error occurred.', 'myplugin' ) );
-        },
-        'type' => 'error',
-        'data' => ['message']
-    ]
-] );
-
-// Trigger: ?error=1&message=Invalid+email+address
-// Shows: "Invalid email address"
-```
-
-### Working with IDs
-```php
-register_admin_notices( 'myplugin', [
-    'item_updated' => [
-        'message' => function( $args ) {
-            if ( ! empty( $args['id'] ) ) {
-                return sprintf( __( 'Item #%d updated.', 'myplugin' ), $args['id'] );
-            }
-            return __( 'Item updated.', 'myplugin' );
-        },
-        'data' => ['id']
-    ]
-] );
-
-// Trigger: ?item_updated=1&id=123
-// Shows: "Item #123 updated."
-```
-
-## Configuration Options
-
-### Notice Configuration
-
-| Option | Type | Description | Default |
-|--------|------|-------------|---------|
-| `message` | string\|callable | The notice message or callback | Required |
-| `type` | string | Notice type: `success`, `error`, `warning`, `info` | `success` |
-| `trigger` | string | GET parameter that triggers the notice | Key name |
-| `data` | array | GET parameters to pass to message callback | `[]` |
-| `condition` | callable | Function to determine if notice should show | `null` |
-| `persistent` | bool | Shows on every page load when condition is met | `false` |
-| `dismissible` | bool | Whether notice can be dismissed | `true` |
-| `capability` | string | Required capability to see notice | `null` |
-| `pages` | array\|string | Admin pages where notice appears (`'all'` for global) | `null` |
-
-### Global Options
-```php
-register_admin_notices( 'myplugin', $notices, [
-    'pages'       => ['myplugin', 'myplugin-*'],  // Wildcard support
-    'capability'  => 'manage_options',
-    'dismissible' => true                          // Default for all notices
-] );
-```
-
-## Type Detection
-
-The system automatically infers notice types from key names:
-```php
-register_admin_notices( 'myplugin', [
-    'item_updated'        => 'Updated!',    // success (default)
-    'item_deleted_error'  => 'Failed!',     // error (suffix)
-    'warning_low_stock'   => 'Low stock',   // warning (prefix)
-    'info_new_feature'    => 'New feature'  // info (prefix)
-] );
-```
-
-## Real-World Example
-```php
-// In your plugin's main file or admin initialization
-add_action( 'admin_init', function() {
-    register_admin_notices( 'woocommerce_extras', [
-        // Simple CRUD notifications
-        'product_added'   => __( 'Product added successfully.', 'wc-extras' ),
-        'product_updated' => __( 'Product updated successfully.', 'wc-extras' ),
-        'product_deleted' => __( 'Product deleted successfully.', 'wc-extras' ),
-        
-        // Bulk operations with counts
-        'bulk_updated' => [
-            'message' => function( $args ) {
-                $count = absint( $args['count'] ?? 0 );
-                return sprintf( 
-                    _n( 
-                        '%d product updated.', 
-                        '%d products updated.', 
-                        $count, 
-                        'wc-extras' 
-                    ), 
-                    $count 
-                );
-            },
-            'data' => ['count']
-        ],
-        
-        // Persistent warnings
-        'shipping_not_configured' => [
-            'condition' => function() {
-                $zones = WC_Shipping_Zones::get_zones();
-                return empty( $zones );
-            },
-            'message' => __( 'No shipping zones configured. Products cannot be shipped.', 'wc-extras' ),
-            'type' => 'warning',
-            'persistent' => true
-        ],
-        
-        // Error handling
-        'import_failed' => [
-            'message' => function( $args ) {
-                $error = $args['error'] ?? __( 'Unknown error', 'wc-extras' );
-                $line = $args['line'] ?? 0;
-                
-                if ( $line > 0 ) {
-                    return sprintf( 
-                        __( 'Import failed at line %d: %s', 'wc-extras' ), 
-                        $line, 
-                        esc_html( $error ) 
-                    );
-                }
-                
-                return sprintf( __( 'Import failed: %s', 'wc-extras' ), esc_html( $error ) );
-            },
-            'type' => 'error',
-            'data' => ['error', 'line']
-        ]
-    ], [
-        'pages' => ['woocommerce', 'edit-product', 'product'],
-        'capability' => 'manage_woocommerce'
-    ] );
+add_action( 'admin_init', function () {
+	register_admin_notices( 'myplugin', [
+		'settings_saved' => [
+			'message' => __( 'Settings saved.', 'my-plugin' ),
+			'type'    => 'success',
+		],
+		'needs_api_key'  => [
+			'message'    => __( 'Add an API key to start syncing.', 'my-plugin' ),
+			'type'       => 'warning',
+			'persistent' => true,
+			'condition'  => fn(): bool => ! get_option( 'myplugin_api_key' ),
+		],
+	] );
 } );
-
-// In your form handler
-function handle_product_save() {
-    $product_id = save_product( $_POST );
-    
-    if ( is_wp_error( $product_id ) ) {
-        $url = add_query_arg( [
-            'import_failed' => 1,
-            'error' => $product_id->get_error_message()
-        ], admin_url( 'edit.php?post_type=product' ) );
-    } else {
-        $url = add_query_arg( [
-            'product_updated' => 1,
-            'id' => $product_id
-        ], admin_url( 'edit.php?post_type=product' ) );
-    }
-    
-    wp_redirect( $url );
-    exit;
-}
 ```
 
-## Requirements
+Two kinds of notice, and the difference is `persistent`.
 
-- PHP 7.4 or later
-- WordPress 5.0 or later
+A **triggered** notice is the message about something that just happened. It
+shows on the request that asks for it and not otherwise:
 
-## Contributing
+```php
+wp_safe_redirect( admin_notice_url( 'settings_saved' ) );
+exit;
+```
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+A **persistent** notice is a condition that is true until it is not. Nothing
+triggers it; it shows whenever its `condition` says so.
 
-## License
+### Options
 
-This project is licensed under the GPL-2.0-or-later License.
+| Option        | Type     | What it does                                               |
+| ------------- | -------- | ---------------------------------------------------------- |
+| `message`     | string   | What it says. Required. Run through `wp_kses_post`.         |
+| `type`        | string   | `info`, `success`, `warning` or `error`. `info` by default. |
+| `persistent`  | bool     | Show without being triggered. `false` by default.           |
+| `dismissible` | bool     | Offer the X, and remember it. `true` by default.            |
+| `capability`  | string   | Who sees it. `manage_options` by default.                   |
+| `screens`     | string[] | Screen ids to limit it to. Everywhere by default.           |
+| `condition`   | callable | Returns whether it still applies.                           |
 
-## Credits
+The context — `myplugin` above — is the plugin's own namespace for its
+notices. It is what keeps two plugins from sharing a dismissal because they
+both called a notice `welcome`.
 
-Created by [David Sherlock](https://davidsherlock.com) at [ArrayPress](https://arraypress.com).
+## What it gets right
+
+Printing a notice is three lines and needs no library. Two things around it
+are not.
+
+**Showing one after a redirect.** An action that saves something has to
+redirect before it renders, so the message about what happened belongs to a
+different request from the work that produced it. That means a query argument,
+and reading it back, and only showing the notice the request actually asked
+for.
+
+**Dismissal that sticks.** Core draws the X and hides the notice; it does not
+remember. A notice that comes back on the next page load is one people learn
+to ignore, and then the one that matters is ignored too. Dismissals are stored
+per user, so one administrator dismissing a notice does not dismiss it for the
+colleagues who have not read it.
+
+The dismiss script is printed only on a request that actually showed a
+dismissible notice, rather than enqueued on every admin page against the
+chance that one appears.
+
+## Undoing a dismissal
+
+```php
+reset_admin_notice( 'myplugin', 'needs_api_key' );
+```
+
+Worth doing when the thing the notice was about changes — a licence that
+expires again should say so again, even to the person who dismissed it last
+year.
+
+`admin_notice_dismissed( 'myplugin', 'needs_api_key' )` answers the question
+without changing anything.
+
+## Upgrading from 1.x
+
+**The type is never guessed.** 1.x inferred it from the key: anything not
+ending in `_error` was a success, so `licence_expired` announced itself in
+green. Set `type` explicitly; it defaults to `info`.
+
+**Auto-dismiss is gone.** A notice that removed itself after a few seconds
+took the message with it, sometimes before it had been read.
+
+**The inline stylesheet is gone.** 140 lines of it, styling core components
+core already styles — including a class copied in from another library
+entirely.
+
+**Dismissal requires a registered key.** The endpoint used to store whatever
+key it was handed, so any signed-in user could write unbounded rows of user
+meta by dismissing notices that did not exist.
+
+## Testing
+
+```bash
+composer test          # phpunit
+composer lint          # phpcs, defect sniffs
+composer format:check  # phpcs, formatting
+```
