@@ -1,0 +1,41 @@
+# What reaches somebody's site.
+#
+# Composer installs a package from a git archive, and git archive honours
+# export-ignore, so everything listed here stops at the repository. That
+# matters more than tidiness: a plugin's vendor directory is scanned, by
+# WordPress.org on submission and by security plugins on the live site, and
+# a test suite full of stubbed core functions is not what anyone wants found
+# in there.
+#
+# src/, assets/, templates/, data/, composer.json and the README ship.
+# Everything that only matters while working on the library does not.
+
+# The suite, and the stubbed core functions it runs against
+/tests export-ignore
+/phpunit.xml export-ignore
+/phpunit.xml.dist export-ignore
+/.phpunit.result.cache export-ignore
+/.phpunit.cache export-ignore
+
+# Continuous integration
+/.github export-ignore
+
+# Coding standards
+/phpcs.xml export-ignore
+/phpcs.xml.dist export-ignore
+/phpcs-format.xml.dist export-ignore
+/phpstan.neon export-ignore
+
+# Repository furniture
+/.gitattributes export-ignore
+/.gitignore export-ignore
+/.editorconfig export-ignore
+/composer.lock export-ignore
+/.DS_Store export-ignore
+
+# Long-form documentation and demonstrations. The README ships.
+/examples export-ignore
+/example export-ignore
+/EXAMPLES.md export-ignore
+/CHANGELOG.md export-ignore
+/SECURITY.md export-ignore

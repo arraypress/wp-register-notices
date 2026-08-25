@@ -40,7 +40,15 @@
         <exclude-pattern>src/Tables/*</exclude-pattern>
     </rule>
 
-
-
+    <!--
+        No runtime code interpreter, anywhere that ships. It is a construct
+        WordPress security scanners report on sight, and a plugin's vendor
+        directory does get scanned: by WordPress.org on submission, and by
+        security plugins on the live site. The sniff is only a warning by
+        default, and a warning does not fail CI.
+    -->
+    <rule ref="Squiz.PHP.Eval">
+        <type>error</type>
+    </rule>
 
 </ruleset>
