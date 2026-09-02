@@ -1,10 +1,8 @@
 name: CI
 
+# On demand only: every push mailed a failing matrix to the maintainer.
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   test:
