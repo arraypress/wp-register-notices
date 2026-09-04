@@ -278,4 +278,49 @@ final class NoticesTest extends TestCase {
 			Notices::url( 'saved', 'https://example.test/wp-admin/admin.php?page=x' )
 		);
 	}
+	/**
+	 * Dismissing a triggered notice does not hide the next one.
+	 *
+	 * "Settings saved." is the message about something that just happened.
+	 * It used to be remembered like any other dismissal, so one click on
+	 * its X and no save ever confirmed itself to that user again.
+	 */
+	public function test_dismissing_a_triggered_notice_does_not_hide_the_next_one(): void {
+		$this->add();
+
+		$GLOBALS['notices_meta'][1]['_dismissed_notice_myplugin_saved'] = time();
+
+		$_GET['notice'] = 'saved';
+
+		$this->assertStringContainsString( 'Settings saved.', $this->render() );
+	}
+
+	/**
+	 * A triggered notice has an X, but nothing to remember, so no script.
+	 */
+	public function test_a_triggered_notice_prints_no_dismissal_script(): void {
+		$this->add();
+
+		$_GET['notice'] = 'saved';
+
+		$html = $this->render();
+
+		$this->assertStringContainsString( 'is-dismissible', $html );
+		$this->assertStringNotContainsString( '<script', $html );
+	}
+
+	/**
+	 * The trigger is taken back out of the URL once the page has loaded.
+	 *
+	 * Core strips its own `message` and `updated` from the admin URL after
+	 * the load, so a refresh does not announce the save a second time. The
+	 * trigger goes on that list.
+	 */
+	public function test_the_trigger_is_removed_from_the_url_afterwards(): void {
+		$this->add();
+
+		$this->assertArrayHasKey( 'removable_query_args', $GLOBALS['notices_hooks'] );
+		$this->assertSame( [ 'message', 'notice' ], Notices::removable_query_args( [ 'message' ] ) );
+		$this->assertSame( [ 'notice' ], Notices::removable_query_args( [ 'notice' ] ), 'The trigger was added twice.' );
+	}
 }

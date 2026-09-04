@@ -101,6 +101,11 @@ final class Notices {
 
 			add_action( 'admin_notices', static fn() => self::render( $context ) );
 			add_action( 'wp_ajax_dismiss_notice_' . $context, static fn() => self::dismiss( $context ) );
+
+			// The trigger is taken back out of the URL once the page has
+			// loaded, the way core does for its own `message` and `updated`,
+			// so a refresh does not announce the save a second time.
+			add_filter( 'removable_query_args', [ self::class, 'removable_query_args' ] );
 		}
 
 		return true;
@@ -128,7 +133,12 @@ final class Notices {
 			return false;
 		}
 
-		if ( $config['dismissible'] && self::dismissed( $context, $key ) ) {
+		// Only a persistent notice is remembered as dismissed. A triggered
+		// one is the message about something that just happened: the X hides
+		// it for now, and the next save is a new message. Remembering it
+		// meant one click on "Settings saved." and no save ever confirmed
+		// itself to that user again.
+		if ( $config['persistent'] && $config['dismissible'] && self::dismissed( $context, $key ) ) {
 			return false;
 		}
 
@@ -162,11 +172,13 @@ final class Notices {
 				wp_kses_post( (string) $config['message'] )
 			);
 
-			$shown = $shown || (bool) $config['dismissible'];
+			$shown = $shown || ( (bool) $config['persistent'] && (bool) $config['dismissible'] );
 		}
 
-		// Only when there is something to remember. A script on every admin
-		// page for a notice that is not there is a script nobody asked for.
+		// Only when there is something to remember: a persistent notice with
+		// an X. A script on every admin page for a notice that is not there,
+		// or one that core's own X already handles, is a script nobody asked
+		// for.
 		if ( $shown ) {
 			self::script( $context );
 		}
@@ -190,6 +202,11 @@ final class Notices {
 		// not exist.
 		if ( '' === $key || 0 === $user_id || ! isset( self::$notices[ $context ][ $key ] ) ) {
 			wp_die( '0', '', [ 'response' => 400 ] );
+		}
+
+		// A triggered notice is not remembered; see applies().
+		if ( ! self::$notices[ $context ][ $key ]['persistent'] ) {
+			wp_die( '1' );
 		}
 
 		update_user_meta( $user_id, self::meta_key( $context, $key ), time() );
@@ -301,17 +318,38 @@ final class Notices {
 	 * @return void
 	 */
 	private static function script( string $context ): void {
-		printf(
-			'<script>(function(){document.addEventListener("click",function(e){' .
+		$script = sprintf(
+			'(function(){document.addEventListener("click",function(e){' .
 			'var b=e.target.closest(".notice-dismiss");if(!b)return;' .
 			'var n=b.closest("[data-notice-key]");if(!n||n.dataset.noticeContext!==%s)return;' .
 			'var d=new FormData();d.append("action","dismiss_notice_"+n.dataset.noticeContext);' .
 			'd.append("key",n.dataset.noticeKey);d.append("_wpnonce",%s);' .
-			'fetch(%s,{method:"POST",body:d,credentials:"same-origin"});});})();</script>',
+			'fetch(%s,{method:"POST",body:d,credentials:"same-origin"});});})();',
 			wp_json_encode( $context ),
 			wp_json_encode( wp_create_nonce( 'dismiss_notice_' . $context ) ),
 			wp_json_encode( admin_url( 'admin-ajax.php' ) )
 		);
+
+		// Through core rather than a bare <script>, so the tag carries
+		// whatever a site's CSP nonce filter adds to every other one.
+		wp_print_inline_script_tag( $script );
+	}
+
+	/**
+	 * Add the trigger to the arguments core strips from the admin URL.
+	 *
+	 * @param string[] $args The arguments so far.
+	 *
+	 * @return string[]
+	 */
+	public static function removable_query_args( $args ): array {
+		$args = (array) $args;
+
+		if ( ! in_array( self::TRIGGER, $args, true ) ) {
+			$args[] = self::TRIGGER;
+		}
+
+		return $args;
 	}
 
 	/**
